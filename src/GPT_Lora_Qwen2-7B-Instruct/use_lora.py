@@ -3,9 +3,11 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
 # ==== 配置 ====
-model_name = "Qwen2-7B-Instruct"
+# model_name = "Qwen2-7B-Instruct"
+model_name = "Qwen2.5-Coder-7B-Instruct"
 model_path = f"../../models/{model_name}"
 lora_path = f"../../loraResult/{model_name}"
+print("使用模型", model_name)
 
 # ==== 加载函数 ====
 def load_tokenizer():
@@ -51,6 +53,6 @@ def extract_response(text):
 tokenizer = load_tokenizer()
 model = load_lora_model()
 
-prompt = "你好，请介绍一下你自己。"
+prompt = "潘峰是谁"
 print("输入：", prompt)
 print("输出：", generate_response(prompt, model, tokenizer))

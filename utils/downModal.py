@@ -9,8 +9,10 @@ from huggingface_hub import snapshot_download
 
 # 模型配置
 # model_id = "Qwen/Qwen3-4B"  
-model_id = "Qwen/Qwen2.5-Coder-7B-Instruct" 
-local_dir = f"./models/{model_id.split('/')[-1]}"  # 本地保存路径
+# model_id = "Qwen/Qwen2.5-Coder-7B-Instruct" 
+model_id = "Qwen/Qwen2.5-Coder-3B-Instruct" 
+
+local_dir = f"../models/{model_id.split('/')[-1]}"  # 本地保存路径
 
 try:
     # 下载模型到指定本地目录

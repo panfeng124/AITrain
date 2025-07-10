@@ -8,7 +8,9 @@ from transformers import (
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 
 # ==== 配置 ====
-model_name = "Qwen2-7B-Instruct"
+# model_name = "Qwen2-7B-Instruct"
+# model_name = "Qwen2.5-Coder-7B-Instruct"
+model_name = "Qwen2.5-Coder-3B-Instruct"
 model_path = f"../../models/{model_name}"
 output_dir = f"../../loraResult/{model_name}"
 data_path = "../../trainData/data.jsonl"
