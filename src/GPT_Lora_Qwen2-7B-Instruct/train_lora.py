@@ -19,6 +19,7 @@ data_path = "../../trainData/data.jsonl"
 def load_tokenizer(path):
     tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
+    tokenizer.model_max_length = 2048  # 避免超长文本 OOM
     return tokenizer
 
 def format_chatml(example):
@@ -43,14 +44,17 @@ def prepare_model(path):
         bnb_4bit_compute_dtype=torch.float16,
         bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type="nf4",
-        llm_int8_enable_fp32_cpu_offload=True,
+        llm_int8_enable_fp32_cpu_offload=True,  # 尽量关闭，除非你显存不够
     )
     model = AutoModelForCausalLM.from_pretrained(path, device_map="auto", trust_remote_code=True, quantization_config=config)
     model = prepare_model_for_kbit_training(model)
     lora_cfg = LoraConfig(
-        r=8, lora_alpha=32, lora_dropout=0.05,
-        bias="none", task_type="CAUSAL_LM",
-        target_modules=["q_proj", "v_proj"]
+        task_type="CAUSAL_LM",
+        r=8,                        # LoRA 的秩，一般 8 或 16
+        lora_alpha=16,              # 通常为 r 的 2 倍
+        lora_dropout=0.05,
+        bias="none",
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]  # 适配 Qwen 架构
     )
     return get_peft_model(model, lora_cfg)
 
@@ -67,14 +71,19 @@ print_trainable_parameters(model)
 
 args = TrainingArguments(
     output_dir=output_dir,
-    num_train_epochs=1,
-    per_device_train_batch_size=1,
-    learning_rate=3e-4,
-    logging_steps=1,
+    num_train_epochs=3,                         # 建议训练多轮，提升学习效果
+    per_device_train_batch_size=4,             # 4070S 显存可支撑 batch size 2~6，建议从4起试验
+    gradient_accumulation_steps=4,             # 累积梯度扩大有效 batch size（如总 batch = 4x4 = 16）
+    learning_rate=2e-4,                        # 3e-4 对大模型偏高，建议尝试 2e-4 更稳
+    lr_scheduler_type="cosine",               # 学习率调度：cosine 收敛更平滑
+    warmup_ratio=0.03,                         # 用 warmup_ratio 替代 warmup_steps，适配不同步数
+    logging_steps=10,
     save_strategy="epoch",
-    warmup_steps=0,
+    evaluation_strategy="no",                  # 可开启验证集评估（若你有验证集）
+    save_total_limit=2,
     max_grad_norm=1.0,
-    fp16=False,
+    bf16=False,                                # 4070 不支持 BF16
+    fp16=True,                                 # 开启 FP16 更省显存（推荐）
     report_to="none"
 )
 
