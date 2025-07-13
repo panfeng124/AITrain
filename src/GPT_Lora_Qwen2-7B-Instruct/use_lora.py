@@ -11,11 +11,13 @@ lora_path = f"../../loraResult/{model_name}"
 def load_tokenizer():
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
+    tokenizer.model_max_length = 2048  # 避免超长文本 OOM
+
     return tokenizer
 
 def load_lora_model():
     config = BitsAndBytesConfig(
-        load_in_4bit=True,
+        load_in_4bit = True,
         bnb_4bit_compute_dtype=torch.float16,
         bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type="nf4",
