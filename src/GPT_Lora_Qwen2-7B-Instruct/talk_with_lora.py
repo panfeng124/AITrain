@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
 # ==== 配置 ====
-model_name = "Qwen2-7B-Instruct"
+model_name = "Qwen2.5-Coder-7B-Instruct"
 model_path = f"../../models/{model_name}"
 lora_path = f"../../loraResult/{model_name}"
 
@@ -20,7 +20,7 @@ def load_lora_model():
         bnb_4bit_compute_dtype=torch.float16,
         bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type="nf4",
-        llm_int8_enable_fp32_cpu_offload=True,
+        llm_int8_enable_fp32_cpu_offload=False,
     )
     base_model = AutoModelForCausalLM.from_pretrained(
         model_path, device_map="auto", trust_remote_code=True, quantization_config=config
@@ -47,7 +47,7 @@ def generate_response(history, model, tokenizer):
     with torch.no_grad():
         output = model.generate(
             **inputs,
-            max_new_tokens=300,
+            max_new_tokens=2048,
             temperature=0.7,
             top_p=0.9,
             do_sample=True,
@@ -59,8 +59,7 @@ def generate_response(history, model, tokenizer):
 def chat():
     tokenizer = load_tokenizer()
     model = load_lora_model()
-    history = []
-
+    history = [{"role": "system", "content": "你是LAB语言助手，如果生成纯代码，要将代码输出在//System-start createApp \n 和 //System-end之间"}]
     print("🤖 开始对话（输入 'exit' 退出）")
     while True:
         user_input = input("你：").strip()
@@ -76,3 +75,5 @@ def chat():
 # ==== 启动 ====
 if __name__ == "__main__":
     chat()
+
+

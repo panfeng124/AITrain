@@ -9,11 +9,11 @@ from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 
 # ==== 配置 ====
 # model_name = "Qwen2-7B-Instruct"
-# model_name = "Qwen2.5-Coder-7B-Instruct"
-model_name = "Qwen2.5-Coder-3B-Instruct"
+model_name = "Qwen2.5-Coder-7B-Instruct"
+# model_name = "Qwen2.5-Coder-3B-Instruct"
 model_path = f"../../models/{model_name}"
 output_dir = f"../../loraResult/{model_name}"
-data_path = "../../trainData/data.jsonl"
+data_path = "../../trainData/merged_2025_07_15_19_11.jsonl"
 
 # ==== 工具函数 ====
 def load_tokenizer(path):
@@ -44,7 +44,7 @@ def prepare_model(path):
         bnb_4bit_compute_dtype=torch.float16,
         bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type="nf4",
-        llm_int8_enable_fp32_cpu_offload=True,  # 尽量关闭，除非你显存不够
+        llm_int8_enable_fp32_cpu_offload=False,  # 尽量关闭，除非你显存不够
     )
     model = AutoModelForCausalLM.from_pretrained(path, device_map="auto", trust_remote_code=True, quantization_config=config)
     model = prepare_model_for_kbit_training(model)
@@ -71,21 +71,20 @@ print_trainable_parameters(model)
 
 args = TrainingArguments(
     output_dir=output_dir,
-    num_train_epochs=3,                         # 建议训练多轮，提升学习效果
-    per_device_train_batch_size=4,             # 4070S 显存可支撑 batch size 2~6，建议从4起试验
+    num_train_epochs=3,                        # 建议训练多轮，提升学习效果
+    per_device_train_batch_size=1,             # 4070S 显存可支撑 batch size 2~6，建议从4起试验
     gradient_accumulation_steps=4,             # 累积梯度扩大有效 batch size（如总 batch = 4x4 = 16）
-    learning_rate=2e-4,                        # 3e-4 对大模型偏高，建议尝试 2e-4 更稳
-    lr_scheduler_type="cosine",               # 学习率调度：cosine 收敛更平滑
+    learning_rate=1e-4,                        # 3e-4 对大模型偏高，建议尝试 2e-4 更稳
+    lr_scheduler_type="cosine",                # 学习率调度：cosine 收敛更平滑
     warmup_ratio=0.03,                         # 用 warmup_ratio 替代 warmup_steps，适配不同步数
     logging_steps=10,
     save_strategy="epoch",
-    evaluation_strategy="no",                  # 可开启验证集评估（若你有验证集）
-    save_total_limit=2,
     max_grad_norm=1.0,
     bf16=False,                                # 4070 不支持 BF16
     fp16=True,                                 # 开启 FP16 更省显存（推荐）
     report_to="none"
 )
+
 
 trainer = Trainer(
     model=model,
@@ -96,4 +95,4 @@ trainer = Trainer(
 
 trainer.train()
 model.save_pretrained(output_dir)
-print("✅ LoRA 微调完成，模型已保存到:", output_dir)
+print("LoRA 微调完成，模型已保存到:", output_dir)

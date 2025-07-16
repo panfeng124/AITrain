@@ -19,11 +19,11 @@ def load_tokenizer():
 
 def load_lora_model():
     config = BitsAndBytesConfig(
-        load_in_4bit = True,
+         load_in_4bit=True,
         bnb_4bit_compute_dtype=torch.float16,
         bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type="nf4",
-        llm_int8_enable_fp32_cpu_offload=True,
+        llm_int8_enable_fp32_cpu_offload=False,  # 尽量关闭，除非你显存不够
     )
     base_model = AutoModelForCausalLM.from_pretrained(
         model_path, device_map="auto", trust_remote_code=True, quantization_config=config
@@ -36,7 +36,7 @@ def generate_response(prompt, model, tokenizer):
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=200,
+            max_new_tokens=2048,
             temperature=0.7,
             top_p=0.9,
             do_sample=True,
@@ -55,6 +55,6 @@ def extract_response(text):
 tokenizer = load_tokenizer()
 model = load_lora_model()
 
-prompt = "潘峰是谁"
+prompt = "使用LAB语言，帮我写一个信息展示组建"
 print("输入：", prompt)
 print("输出：", generate_response(prompt, model, tokenizer))
