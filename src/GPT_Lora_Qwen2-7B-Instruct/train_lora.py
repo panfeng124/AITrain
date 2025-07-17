@@ -9,8 +9,9 @@ from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 
 # ==== 配置 ====
 # model_name = "Qwen2-7B-Instruct"
-model_name = "Qwen2.5-Coder-7B-Instruct"
+# model_name = "Qwen2.5-Coder-7B-Instruct"
 # model_name = "Qwen2.5-Coder-3B-Instruct"
+model_name = "Qwen3-4B"
 model_path = f"../../models/{model_name}"
 output_dir = f"../../loraResult/{model_name}"
 data_path = "../../trainData/merged_2025_07_15_19_11.jsonl"
@@ -19,7 +20,7 @@ data_path = "../../trainData/merged_2025_07_15_19_11.jsonl"
 def load_tokenizer(path):
     tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
-    tokenizer.model_max_length = 2048  # 避免超长文本 OOM
+    tokenizer.model_max_length = 32768  # 避免超长文本 OOM
     return tokenizer
 
 def format_chatml(example):

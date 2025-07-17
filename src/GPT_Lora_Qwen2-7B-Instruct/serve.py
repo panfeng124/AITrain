@@ -6,16 +6,17 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 # ==== 模型加载 ====
-model_name = "Qwen2-7B-Instruct"
+model_name = "Qwen3-4B"
 model_path = f"../../models/{model_name}"
 lora_path = f"../../loraResult/{model_name}"
 
 print("加载 tokenizer...")
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
-tokenizer.model_max_length = 32768
+tokenizer.model_max_length = 1024
 
 print("加载 base model + LoRA...")
 config = BitsAndBytesConfig(
@@ -32,6 +33,14 @@ model = PeftModel.from_pretrained(base_model, lora_path, device_map="auto").eval
 
 # ==== FastAPI ====
 app = FastAPI()
+# 允许所有源，所有方法，所有头（不推荐生产环境使用）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允许所有源
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许所有方法
+    allow_headers=["*"],  # 允许所有头
+)
 
 class Message(BaseModel):
     role: str

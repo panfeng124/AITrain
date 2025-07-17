@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGLM3 本地服务客户端</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#7C3AED',
+                        neutral: {
+                            100: '#F3F4F6',
+                            200: '#E5E7EB',
+                            700: '#374151',
+                            800: '#1F2937',
+                            900: '#111827'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .chat-bubble-user {
+                @apply bg-primary text-white rounded-t-lg rounded-bl-lg p-4 max-w-[85%] break-words;
+            }
+            .chat-bubble-ai {
+                @apply bg-neutral-100 text-neutral-800 rounded-t-lg rounded-br-lg p-4 max-w-[85%] break-words;
+            }
+            .typing-animation span {
+                @apply inline-block w-2 h-2 bg-primary rounded-full mx-0.5;
+                animation: typing 1.4s infinite both;
+            }
+            .typing-animation span:nth-child(2) {
+                animation-delay: 0.2s;
+            }
+            .typing-animation span:nth-child(3) {
+                animation-delay: 0.4s;
+            }
+            @keyframes typing {
+                0% { transform: translateY(0); }
+                50% { transform: translateY(-5px); }
+                100% { transform: translateY(0); }
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-neutral-800 to-neutral-900 min-h-screen text-neutral-100 font-sans">
+    <div class="max-w-4xl mx-auto px-4 py-8 flex flex-col h-screen">
+        <!-- 头部 -->
+        <header class="mb-6 border-b border-neutral-700 pb-4">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
+                ChatGLM3 本地服务客户端
+            </h1>
+            <p class="text-neutral-400 mt-2">与本地部署的 ChatGLM3 模型进行对话</p>
+        </header>
+
+        <!-- 聊天区域 -->
+        <main class="flex-1 overflow-y-auto scrollbar-hide mb-4" id="chatContainer">
+            <!-- 初始欢迎消息 -->
+            <div class="flex items-start mb-4">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center mr-3 flex-shrink-0">
+                    <i class="fa fa-robot text-primary text-xl"></i>
+                </div>
+                <div class="chat-bubble-ai">
+                    <p>你好！我是基于 ChatGLM3 模型的 AI。我可以回答问题、提供信息、进行对话等。请问有什么可以帮助你的？</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- 输入区域 -->
+        <footer class="relative">
+            <div class="bg-neutral-800 rounded-xl p-3 shadow-lg">
+                <div class="flex">
+                    <textarea 
+                        id="userInput" 
+                        class="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                        rows="2" 
+                        placeholder="输入你的问题..."
+                    ></textarea>
+                    <button 
+                        id="sendBtn" 
+                        class="ml-3 bg-primary hover:bg-primary/90 text-white rounded-lg px-4 py-2 transition-all duration-300 transform hover:scale-105 flex items-center justify-center"
+                    >
+                        <i class="fa fa-paper-plane mr-2"></i>
+                        <span>发送</span>
+                    </button>
+                </div>
+                <div class="flex justify-between items-center mt-2 text-xs text-neutral-500">
+                    <div id="charCount" class="text-neutral-400">0/2000</div>
+                    <button id="clearBtn" class="hover:text-primary transition-colors duration-300">
+                        <i class="fa fa-trash-o mr-1"></i> 清空对话
+                    </button>
+                </div>
+            </div>
+            <div class="text-center text-xs text-neutral-500 mt-3">
+                提示：支持多轮对话，所有交互仅在本地进行
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 存储对话历史
+        let messages = [
+            {
+                role: "assistant",
+                content: "你好！我是基于 ChatGLM3 模型的 AI。我可以回答问题、提供信息、进行对话等。请问有什么可以帮助你的？"
+            }
+        ];
+
+        // DOM 元素
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const charCount = document.getElementById('charCount');
+
+        // 字符计数
+        userInput.addEventListener('input', () => {
+            const count = userInput.value.length;
+            charCount.textContent = `${count}/2000`;
+            
+            if (count > 2000) {
+                charCount.classList.add('text-red-500');
+                userInput.value = userInput.value.substring(0, 2000);
+                charCount.textContent = `2000/2000`;
+            } else {
+                charCount.classList.remove('text-red-500');
+            }
+        });
+
+        // 发送消息
+        function sendMessage() {
+            const content = userInput.value.trim();
+            if (!content) return;
+
+            // 添加用户消息到对话历史
+            messages.push({
+                role: "user",
+                content
+            });
+
+            // 显示用户消息
+            renderMessages();
+
+            // 清空输入框
+            userInput.value = '';
+            charCount.textContent = '0/2000';
+
+            // 显示AI正在输入
+            showTypingIndicator();
+
+            // 调用API
+            callChatGLMAPI(content);
+        }
+
+        // 显示AI正在输入的指示器
+        function showTypingIndicator() {
+            const typingHtml = `
+                <div class="flex items-start mb-4 opacity-0" id="typingIndicator">
+                    <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center mr-3 flex-shrink-0">
+                        <i class="fa fa-robot text-primary text-xl"></i>
+                    </div>
+                    <div class="chat-bubble-ai typing-animation">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            `;
+            chatContainer.insertAdjacentHTML('beforeend', typingHtml);
+            
+            // 平滑显示
+            setTimeout(() => {
+                document.getElementById('typingIndicator').classList.remove('opacity-0');
+                document.getElementById('typingIndicator').classList.add('opacity-100', 'transition-opacity', 'duration-300');
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }, 10);
+        }
+
+        // 移除AI正在输入的指示器
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // 调用ChatGLM API
+        async function callChatGLMAPI(content) {
+            try {
+                const response = await fetch("http://0.0.0.0:8000/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        model: "chatglm3",
+                        messages: messages.map(msg => ({
+                            role: msg.role,
+                            content: msg.content
+                        }))
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API请求失败: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // 添加AI回复到对话历史
+                messages.push({
+                    role: "assistant",
+                    content: data.response
+                });
+
+                // 移除正在输入指示器
+                removeTypingIndicator();
+
+                // 显示AI回复
+                renderMessages();
+            } catch (error) {
+                // 移除正在输入指示器
+                removeTypingIndicator();
+                
+                // 显示错误消息
+                messages.push({
+                    role: "error",
+                    content: `请求API时出错: ${error.message}`
+                });
+                
+                renderMessages();
+                console.error("API调用错误:", error);
+            }
+        }
+
+        // 渲染所有消息
+        function renderMessages() {
+            chatContainer.innerHTML = '';
+            
+            messages.forEach((msg, index) => {
+                let messageHtml = '';
+                
+                if (msg.role === "user") {
+                    messageHtml = `
+                        <div class="flex items-start justify-end mb-4">
+                            <div class="chat-bubble-user">
+                                ${formatMessageContent(msg.content)}
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center ml-3 flex-shrink-0">
+                                <i class="fa fa-user text-secondary text-xl"></i>
+                            </div>
+                        </div>
+                    `;
+                } else if (msg.role === "assistant") {
+                    messageHtml = `
+                        <div class="flex items-start mb-4">
+                            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center mr-3 flex-shrink-0">
+                                <i class="fa fa-robot text-primary text-xl"></i>
+                            </div>
+                            <div class="chat-bubble-ai">
+                                ${formatMessageContent(msg.content)}
+                            </div>
+                        </div>
+                    `;
+                } else if (msg.role === "error") {
+                    messageHtml = `
+                        <div class="flex items-start mb-4">
+                            <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center mr-3 flex-shrink-0">
+                                <i class="fa fa-exclamation-triangle text-red-500 text-xl"></i>
+                            </div>
+                            <div class="bg-red-500/10 text-red-400 rounded-t-lg rounded-br-lg p-4 max-w-[85%]">
+                                ${formatMessageContent(msg.content)}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                chatContainer.insertAdjacentHTML('beforeend', messageHtml);
+            });
+            
+            // 滚动到底部
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 格式化消息内容（处理换行）
+        function formatMessageContent(content) {
+            // 替换换行符为<br>
+            return content.replace(/\n/g, '<br>');
+        }
+
+        // 清空对话
+        function clearConversation() {
+            messages = [
+                {
+                    role: "assistant",
+                    content: "对话已清空。请问有什么可以帮助你的？"
+                }
+            ];
+            renderMessages();
+        }
+
+        // 事件监听
+        sendBtn.addEventListener('click', sendMessage);
+        
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        clearBtn.addEventListener('click', clearConversation);
+
+        // 初始渲染
+        renderMessages();
+    </script>
+</body>
+</html>
+    
