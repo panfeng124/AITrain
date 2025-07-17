@@ -207,7 +207,7 @@
         // 调用ChatGLM API
         async function callChatGLMAPI(content) {
             try {
-                const response = await fetch("http://0.0.0.0:8000/chat", {
+                const response = await fetch("http://0.0.0.0:8100/chat", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"

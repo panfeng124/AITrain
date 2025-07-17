@@ -1,2 +1,4 @@
 loraResult
 models
+trainData
+__pycache__/
