@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChatGLM3 本地服务客户端</title>
+    <title>LAB_AI_saerve 本地服务客户端</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -63,14 +64,16 @@
         }
     </style>
 </head>
+
 <body class="bg-gradient-to-br from-neutral-800 to-neutral-900 min-h-screen text-neutral-100 font-sans">
     <div class="max-w-4xl mx-auto px-4 py-8 flex flex-col h-screen">
         <!-- 头部 -->
         <header class="mb-6 border-b border-neutral-700 pb-4">
-            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
-                ChatGLM3 本地服务客户端
+            <h1
+                class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
+                LAB_AI_saerve 本地服务客户端
             </h1>
-            <p class="text-neutral-400 mt-2">与本地部署的 ChatGLM3 模型进行对话</p>
+            <p class="text-neutral-400 mt-2">与本地部署的 LAB_AI_saerve 模型进行对话</p>
         </header>
 
         <!-- 聊天区域 -->
@@ -81,7 +84,7 @@
                     <i class="fa fa-robot text-primary text-xl"></i>
                 </div>
                 <div class="chat-bubble-ai">
-                    <p>你好！我是基于 ChatGLM3 模型的 AI。我可以回答问题、提供信息、进行对话等。请问有什么可以帮助你的？</p>
+                   
                 </div>
             </div>
         </main>
@@ -90,16 +93,11 @@
         <footer class="relative">
             <div class="bg-neutral-800 rounded-xl p-3 shadow-lg">
                 <div class="flex">
-                    <textarea 
-                        id="userInput" 
+                    <textarea id="userInput"
                         class="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-                        rows="2" 
-                        placeholder="输入你的问题..."
-                    ></textarea>
-                    <button 
-                        id="sendBtn" 
-                        class="ml-3 bg-primary hover:bg-primary/90 text-white rounded-lg px-4 py-2 transition-all duration-300 transform hover:scale-105 flex items-center justify-center"
-                    >
+                        rows="2" placeholder="输入你的问题..."></textarea>
+                    <button id="sendBtn"
+                        class="ml-3 bg-primary hover:bg-primary/90 text-white rounded-lg px-4 py-2 transition-all duration-300 transform hover:scale-105 flex items-center justify-center">
                         <i class="fa fa-paper-plane mr-2"></i>
                         <span>发送</span>
                     </button>
@@ -121,8 +119,8 @@
         // 存储对话历史
         let messages = [
             {
-                role: "assistant",
-                content: "你好！我是基于 ChatGLM3 模型的 AI。我可以回答问题、提供信息、进行对话等。请问有什么可以帮助你的？"
+                role: "system",
+                content: "提供LAB/LUI的帮助"
             }
         ];
 
@@ -137,7 +135,7 @@
         userInput.addEventListener('input', () => {
             const count = userInput.value.length;
             charCount.textContent = `${count}/2000`;
-            
+
             if (count > 2000) {
                 charCount.classList.add('text-red-500');
                 userInput.value = userInput.value.substring(0, 2000);
@@ -187,7 +185,7 @@
                 </div>
             `;
             chatContainer.insertAdjacentHTML('beforeend', typingHtml);
-            
+
             // 平滑显示
             setTimeout(() => {
                 document.getElementById('typingIndicator').classList.remove('opacity-0');
@@ -207,13 +205,13 @@
         // 调用ChatGLM API
         async function callChatGLMAPI(content) {
             try {
-                const response = await fetch("http://0.0.0.0:8100/chat", {
+                const response = await fetch("http://47.109.87.216:7101/chat", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        model: "chatglm3",
+                        model: "LAB_AI_saerve",
                         messages: messages.map(msg => ({
                             role: msg.role,
                             content: msg.content
@@ -226,7 +224,9 @@
                 }
 
                 const data = await response.json();
-                
+
+                console.log("data:", data)
+                console.log("messages:", messages)
                 // 添加AI回复到对话历史
                 messages.push({
                     role: "assistant",
@@ -241,13 +241,13 @@
             } catch (error) {
                 // 移除正在输入指示器
                 removeTypingIndicator();
-                
+
                 // 显示错误消息
                 messages.push({
                     role: "error",
                     content: `请求API时出错: ${error.message}`
                 });
-                
+
                 renderMessages();
                 console.error("API调用错误:", error);
             }
@@ -256,10 +256,10 @@
         // 渲染所有消息
         function renderMessages() {
             chatContainer.innerHTML = '';
-            
+
             messages.forEach((msg, index) => {
                 let messageHtml = '';
-                
+
                 if (msg.role === "user") {
                     messageHtml = `
                         <div class="flex items-start justify-end mb-4">
@@ -294,10 +294,10 @@
                         </div>
                     `;
                 }
-                
+
                 chatContainer.insertAdjacentHTML('beforeend', messageHtml);
             });
-            
+
             // 滚动到底部
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
@@ -321,19 +321,19 @@
 
         // 事件监听
         sendBtn.addEventListener('click', sendMessage);
-        
+
         userInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
             }
         });
-        
+
         clearBtn.addEventListener('click', clearConversation);
 
         // 初始渲染
         renderMessages();
     </script>
 </body>
+
 </html>
-    

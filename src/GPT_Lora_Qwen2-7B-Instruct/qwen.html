@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Qwen Chat</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      height: 100%;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #d6d8db;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      height: 100%;
+      color: #333;
+      overflow: hidden;
+    }
+
+    .content {
+      width: 700px;
+      height: 100%;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+      background-color: #263646;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .title {
+      text-align: center;
+      padding: 20px 0;
+      border-bottom: 1px solid #e5e7eb;
+      border-radius: 12px 12px 0 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: white;
+    }
+
+    #chat {
+      overflow-y: auto;
+      flex: 1 1 auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 100px;
+    }
+
+    .message {
+      display: flex;
+      margin-bottom: 8px;
+    }
+
+    .user-message,
+    .assistant-message {
+      padding: 12px 16px;
+      border-radius: 18px;
+      line-height: 1.6;
+      max-width: 80%;
+      position: relative;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .user-message {
+      background: #4f46e5;
+      color: white;
+      align-self: flex-end;
+      border-radius: 18px 18px 0 18px;
+    }
+
+    .assistant-message {
+      background: #f3f4f6;
+      color: #1f2937;
+      align-self: flex-start;
+      border-radius: 18px 18px 18px 0;
+    }
+
+    .user-message::after,
+    .assistant-message::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      width: 12px;
+      height: 16px;
+    }
+
+    .user-message::after {
+      right: -10px;
+      border-right: 12px solid transparent;
+      border-top: 16px solid #4f46e5;
+    }
+
+    .assistant-message::after {
+      left: -10px;
+      border-left: 12px solid transparent;
+      border-top: 16px solid #f3f4f6;
+    }
+
+    .user-message,
+    .assistant-message {
+      white-space: pre-line;
+      /* 或 pre-wrap */
+    }
+
+
+    #chat-form {
+      display: flex;
+      gap: 12px;
+      padding: 20px;
+      border-top: 1px solid #e5e7eb;
+      background: #f8fafc;
+      border-radius: 0 0 12px 12px;
+      height: 120px;
+    }
+
+    #user-input {
+      flex: 1;
+      padding: 14px 16px;
+      border-radius: 24px;
+      border: 1px solid #d1d5db;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    #user-input:focus {
+      border-color: #4f46e5;
+    }
+
+    button {
+      padding: 14px 24px;
+      border-radius: 24px;
+      border: none;
+      background-color: #4f46e5;
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    button:hover {
+      background-color: #4338ca;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    #chat::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #chat::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    #chat::-webkit-scrollbar-thumb {
+      background: #c5c5c5;
+      border-radius: 10px;
+    }
+
+    #chat::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="content">
+    <h1 class="title">LAB/LUI AI服务</h1>
+
+    <div id="chat">
+      <div class="assistant-message">
+        你好！有什么我可以帮你的吗？😊
+      </div>
+    </div>
+
+    <form id="chat-form">
+      <input type="text" id="user-input" placeholder="输入你的问题..." required>
+      <button type="submit">发送</button>
+    </form>
+
+  </div>
+
+  <script>
+    const API_KEY = "sk-1e82de16937545f781f00756c6289e2b";
+    const MODEL_NAME = "qwen-plus";
+    const serverUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+
+    const taskSystemContent = `你是一个任务识别助手，用户会输入自然语言请求。你的任务是识别其意图，并根据信息完整性进行响应。
+---
+当前支持的任务类型（可多选）：
+1. **chat**：聊天、问答、概念解释，例如：“成都天气怎么样？”
+2. **createApp**：创建一个 APP，包括界面、按钮、组件等。例如：“我想做一个显示用户信息的界面”
+3. **editApp**：修改已有 APP，**必须包含 APP 名称和修改内容**，例如：“把‘我的界面’背景改成红色”
+4. **deleteApp**：删除已有 APP，**必须包含 APP 名称**，例如：“删除‘设置页面’”
+
+---
+### 步骤一：判断意图
+- 从用户输入中判断属于哪些任务类型
+### 步骤二：判断信息是否完整
+- 若信息**不完整**（如缺名称或修改内容），直接提出具体问题，引导用户补全。不要输出命令。
+- 若信息**完整**，输出结构化命令，格式如下：
+//>>>
+(createApp "APP名称" "创建需求内容")
+(editApp "APP名称" "修改需求内容")
+(deleteApp "APP名称")
+(chat "聊天内容")
+
+---
+### ！输出规范：
+- **不可同时提问和输出命令**，必须二选一。
+- 提问应自然清晰，避免冗余套话。
+- 输出命令时，格式严格匹配，包括括号、引号、缩进、起始标记 '//>>> \n'，注意换行
+- 如果无法归类或语义模糊，视为 'chat'，并保留原始输入。
+
+---
+### 示例 1（完整）：
+输入：
+我想创建一个 APP，叫“用户中心”，用来展示头像和昵称
+
+输出：
+//>>>
+(createApp "用户中心" "展示头像和昵称")
+
+---
+### 示例 2（缺少修改内容）：
+输入：
+我要修改“设置页面”
+
+输出：
+请问你想对“设置页面”做什么修改？
+
+---
+### 示例 3（缺少 APP 名称）：
+输入：
+我要改一下界面颜色
+
+输出：
+请问你要修改哪个 APP？想把界面颜色改成什么样？
+
+---
+### 示例 4（默认归类为 chat）：
+输入：
+帮我查一下成都下周天气
+
+输出：
+//>>>
+(chat "帮我查一下成都下周天气")
+`
+
+    const chatDiv = document.getElementById("chat");
+    const chatForm = document.getElementById("chat-form");
+    const userInput = document.getElementById("user-input");
+
+    // 初始对话上下文
+    const taskMessages = [
+      { role: "system", content: taskSystemContent }
+    ];
+
+    function appendMessage(role, content) {
+      const msg = document.createElement("div");
+      msg.className = role === "user" ? "user-message" : "assistant-message";
+      msg.innerHTML = `<strong>${role}:</strong> ${content}`;
+      chatDiv.appendChild(msg);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+
+
+    async function fetchAI(messages) {
+      return await fetch(`${serverUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${API_KEY}`
+        },
+        body: JSON.stringify({
+          model: MODEL_NAME,
+          messages: messages
+        })
+      });
+    }
+
+    const pattern = /^\s*\/\/>>>(\n)?/;
+    const chatPattern = /^\(\s*chat/;
+
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const content = userInput.value.trim();
+      if (!content) return;
+
+      // 显示用户输入
+      appendMessage("user", content);
+      taskMessages.push({ role: "user", content });
+      userInput.value = "";
+
+      try {
+        let response = await fetchAI(taskMessages)
+        let result = await response.json();
+        let reply = result.choices?.[0]?.message?.content || "⚠️ 无响应";
+        console.log(reply)
+        if (pattern.test(reply)) {
+          reply = reply.replace(pattern, '');
+          if (chatPattern.test(reply)) {
+            reply = reply.replace(chatPattern, '');
+            const index = reply.lastIndexOf(")");
+            if (index !== -1) {
+              reply = reply.slice(0, index)
+            }
+            newMessages = taskMessages.slice(1);
+            //newMessages.push({ role: "assistant", content: reply });
+
+            console.log("assistant:", newMessages)
+            response = await fetchAI(newMessages)
+            result = await response.json();
+            reply = result.choices?.[0]?.message?.content || "⚠️ 无响应";
+          } else {
+
+          }
+        } else {
+
+        }
+        appendMessage("assistant", reply);
+        taskMessages.push({ role: "assistant", content: reply });
+
+      } catch (err) {
+        console.error(err);
+        appendMessage("assistant", "❌ 请求失败，请检查网络或API Key");
+      }
+    });
+  </script>
+</body>
+
+</html>
