@@ -120,7 +120,7 @@
         let messages = [
             {
                 role: "system",
-                content: "提供LAB/LUI的帮助"
+                content: "代碼生成助手"
             }
         ];
 
@@ -205,7 +205,8 @@
         // 调用ChatGLM API
         async function callChatGLMAPI(content) {
             try {
-                const response = await fetch("http://47.109.87.216:7101/chat", {
+                //const response = await fetch("http://47.109.87.216:7101/chat", {
+                const response = await fetch("http://localhost:7101/chat", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"

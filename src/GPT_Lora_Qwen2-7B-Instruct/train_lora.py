@@ -11,7 +11,7 @@ from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 # model_name = "Qwen2-7B-Instruct"
 # model_name = "Qwen2.5-Coder-7B-Instruct"
 # model_name = "Qwen2.5-Coder-3B-Instruct"
-model_name = "Qwen3-4B"
+model_name = "Qwen2.5-Coder-7B-Instruct"
 model_path = f"../../models/{model_name}"
 output_dir = f"../../loraResult/{model_name}"
 data_path = "../../trainData/merged_2025_07_15_19_11.jsonl"
@@ -34,8 +34,16 @@ def load_dataset(path, tokenizer):
         raw_data = [json.loads(line) for line in f if line.strip()]
     dataset = Dataset.from_list(raw_data)
     dataset = dataset.map(format_chatml)
-    dataset = dataset.map(lambda ex: tokenizer(ex["text"], truncation=True, padding="max_length", max_length=512), batched=True)
-    dataset = dataset.remove_columns(["messages", "text"])
+
+    def tokenize_function(examples):
+        return tokenizer(examples["text"], truncation=True, max_length=512)
+
+    dataset = dataset.map(
+        tokenize_function,
+        batched=True,
+        remove_columns=["messages", "text"],
+        num_proc=4
+    )
     dataset.set_format("torch")
     return dataset
 
