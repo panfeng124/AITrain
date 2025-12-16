@@ -1,4 +1,4 @@
-# serve.py
+# ok_serve.py
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Optional
@@ -120,7 +120,7 @@ async def chat_endpoint(request: ChatRequest):
 if __name__ == "__main__":
     print("啟動服務：http://localhost:7101/chat")
     uvicorn.run(
-        "serve:app",
+        "ok_serve:app",
         host="0.0.0.0",
         port=7101,
         workers=1,
