@@ -114,7 +114,18 @@ async def chat_endpoint(request: ChatRequest):
 
     full_output = tokenizer.decode(outputs[0], skip_special_tokens=False)
     response = extract_response(full_output)
-    return {"response": response}
+    # ✅ 返回与阿里云 Qwen API 兼容的格式
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": response
+                }
+            }
+        ]
+    }
+    # return {"response": response}
 
 # ==== 啟動 ====
 if __name__ == "__main__":
