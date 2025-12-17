@@ -84,7 +84,7 @@
                     <i class="fa fa-robot text-primary text-xl"></i>
                 </div>
                 <div class="chat-bubble-ai">
-                   
+
                 </div>
             </div>
         </main>
@@ -205,8 +205,8 @@
         // 调用ChatGLM API
         async function callChatGLMAPI(content) {
             try {
-                const response = await fetch("http://47.109.87.216:7101/chat", {
-                //const response = await fetch("http://localhost:7101/chat", {
+                // const response = await fetch("http://47.109.87.216:7101/chat", {
+                const response = await fetch("http://localhost:7101/chat", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
@@ -231,7 +231,7 @@
                 // 添加AI回复到对话历史
                 messages.push({
                     role: "assistant",
-                    content: data.response
+                    content: data.choices?.[0]?.message?.content || "无响应"
                 });
 
                 // 移除正在输入指示器
@@ -253,6 +253,7 @@
                 console.error("API调用错误:", error);
             }
         }
+        
 
         // 渲染所有消息
         function renderMessages() {

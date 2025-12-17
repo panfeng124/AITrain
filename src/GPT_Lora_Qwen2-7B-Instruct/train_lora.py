@@ -80,7 +80,7 @@ print_trainable_parameters(model)
 
 args = TrainingArguments(
     output_dir=output_dir,
-    num_train_epochs=10,                        # 建议训练多轮，提升学习效果
+    num_train_epochs=20,                        # 建议训练多轮，提升学习效果
     per_device_train_batch_size=1,             # 4070S 显存可支撑 batch size 2~6，建议从4起试验
     gradient_accumulation_steps=4,             # 累积梯度扩大有效 batch size（如总 batch = 4x4 = 16）
     learning_rate=1e-4,                        # 3e-4 对大模型偏高，建议尝试 2e-4 更稳
