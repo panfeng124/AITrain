@@ -36,7 +36,7 @@ def load_dataset(path, tokenizer):
     dataset = dataset.map(format_chatml)
 
     def tokenize_function(examples):
-        return tokenizer(examples["text"], truncation=True, max_length=512)
+        return tokenizer(examples["text"], truncation=True, max_length=3072)
 
     dataset = dataset.map(
         tokenize_function,
@@ -47,25 +47,49 @@ def load_dataset(path, tokenizer):
     dataset.set_format("torch")
     return dataset
 
-def prepare_model(path):
+
+def prepare_model(path, resume_lora=False, lora_path=None):
     config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_compute_dtype=torch.float16,
         bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type="nf4",
-        llm_int8_enable_fp32_cpu_offload=False,  # 尽量关闭，除非你显存不够
+        llm_int8_enable_fp32_cpu_offload=False,
     )
-    model = AutoModelForCausalLM.from_pretrained(path, device_map="auto", trust_remote_code=True, quantization_config=config)
-    model = prepare_model_for_kbit_training(model)
-    lora_cfg = LoraConfig(
-        task_type="CAUSAL_LM",
-        r=8,                        # LoRA 的秩，一般 8 或 16
-        lora_alpha=16,              # 通常为 r 的 2 倍
-        lora_dropout=0.05,
-        bias="none",
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]  # 适配 Qwen 架构
+
+    base_model = AutoModelForCausalLM.from_pretrained(
+        path,
+        device_map="auto",
+        trust_remote_code=True,
+        quantization_config=config
     )
-    return get_peft_model(model, lora_cfg)
+
+    base_model = prepare_model_for_kbit_training(base_model)
+
+    if resume_lora:
+        assert lora_path is not None, "resume_lora=True 时必须提供 lora_path"
+        print(f"🔁 从已有 LoRA 加载继续训练: {lora_path}")
+        model = PeftModel.from_pretrained(
+            base_model,
+            lora_path,
+            is_trainable=True,   # ⚠️ 关键：否则不会继续更新
+        )
+    else:
+        print("🆕 创建新的 LoRA")
+        lora_cfg = LoraConfig(
+            task_type="CAUSAL_LM",
+            r=16,
+            lora_alpha=32,
+            lora_dropout=0.05,
+            bias="none",
+            target_modules=[
+                "q_proj", "k_proj", "v_proj", "o_proj",
+                "gate_proj", "up_proj", "down_proj"
+            ]
+        )
+        model = get_peft_model(base_model, lora_cfg)
+
+    return model
 
 def print_trainable_parameters(model):
     total = sum(p.numel() for p in model.parameters())
@@ -75,23 +99,43 @@ def print_trainable_parameters(model):
 # ==== 主流程 ====
 tokenizer = load_tokenizer(model_path)
 dataset = load_dataset(data_path, tokenizer)
-model = prepare_model(model_path)
+resume_lora = True   # ← 你现在要的模式
+model = prepare_model(
+    model_path,
+    resume_lora=resume_lora,
+    lora_path=output_dir
+)
+
+if resume_lora:
+    # ===== 继续训练（精修 / 打磨）=====
+    num_train_epochs = 3        # 或 5
+    learning_rate = 1e-4        # 或 8e-5
+    warmup_ratio = 0.03
+    phase_name = "resume"
+else:
+    # ===== 从头 LoRA（语言塑形期）=====
+    num_train_epochs = 7
+    learning_rate = 2e-4
+    warmup_ratio = 0.05
+    phase_name = "from_scratch"
+
 print_trainable_parameters(model)
 
 args = TrainingArguments(
     output_dir=output_dir,
-    num_train_epochs=20,                        # 建议训练多轮，提升学习效果
+    num_train_epochs=num_train_epochs,                        # 建议训练多轮，提升学习效果
     per_device_train_batch_size=1,             # 4070S 显存可支撑 batch size 2~6，建议从4起试验
     gradient_accumulation_steps=4,             # 累积梯度扩大有效 batch size（如总 batch = 4x4 = 16）
-    learning_rate=1e-4,                        # 3e-4 对大模型偏高，建议尝试 2e-4 更稳
+    learning_rate=learning_rate,                        # 3e-4 对大模型偏高，建议尝试 2e-4 更稳
     lr_scheduler_type="cosine",                # 学习率调度：cosine 收敛更平滑
-    warmup_ratio=0.03,                         # 用 warmup_ratio 替代 warmup_steps，适配不同步数
+    warmup_ratio=warmup_ratio,                         # 用 warmup_ratio 替代 warmup_steps，适配不同步数
     logging_steps=10,
     save_strategy="epoch",
     max_grad_norm=1.0,
     bf16=False,                                # 4070 不支持 BF16
     fp16=True,                                 # 开启 FP16 更省显存（推荐）
-    report_to="none"
+    report_to="none",
+    run_name=f"LAB-lora-{phase_name}"  # ⭐ 非常推荐
 )
 
 
@@ -101,6 +145,16 @@ trainer = Trainer(
     train_dataset=dataset,
     data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 )
+
+print(f"""
+==============================
+ Training Phase: {phase_name}
+ resume_lora   : {resume_lora}
+ epochs        : {num_train_epochs}
+ lr            : {learning_rate}
+ warmup_ratio  : {warmup_ratio}
+==============================
+""")
 
 trainer.train()
 model.save_pretrained(output_dir)
