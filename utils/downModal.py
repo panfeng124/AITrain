@@ -9,9 +9,10 @@ from huggingface_hub import snapshot_download
 
 # 模型配置
 # model_id = "Qwen/Qwen3-4B"  
-# model_id = "Qwen/Qwen2.5-Coder-7B-Instruct" 
+#model_id = "Qwen/Qwen2.5-Coder-7B-Instruct" 
+model_id = "Qwen/Qwen2.5-Coder-1.5B-Instruct" 
 # model_id = "Qwen/Qwen2.5-Coder-3B-Instruct" 
-model_id = "Qwen/Qwen2.5-Coder-0.5B-Instruct" 
+# model_id = "Qwen/Qwen2.5-Coder-0.5B-Instruct" 
 
 local_dir = f"../models/{model_id.split('/')[-1]}"  # 本地保存路径
 
